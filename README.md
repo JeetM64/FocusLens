@@ -36,7 +36,7 @@ Development Phases
 
 Getting Started
 bash# Clone and navigate
-git clone https://github.com/YOUR_USERNAME/FocusLens.git
+git clone https://github.com/JeetM64/FocusLens.git
 cd FocusLens
 
 # Install desktop app deps

@@ -1,0 +1,31 @@
+{
+  "name": "focuslens-desktop",
+  "version": "0.1.0",
+  "description": "FocusLens — behavioral telemetry capture client",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder"
+  },
+  "keywords": ["electron", "telemetry", "focus", "cognitive"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "dependencies": {
+    "active-win": "^8.0.0",
+    "ws": "^8.16.0",
+    "electron-store": "^8.2.0",
+    "uuid": "^9.0.0"
+  },
+  "build": {
+    "appId": "com.focuslens.desktop",
+    "productName": "FocusLens",
+    "directories": {
+      "output": "release"
+    }
+  }
+}
