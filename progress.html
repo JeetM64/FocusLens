@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>FocusLens — Progress</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0a0a;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:32px}
+  h1{font-size:20px;font-weight:600;margin-bottom:4px}
+  .sub{font-size:12px;color:#555;margin-bottom:28px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+  .card{background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:18px 20px}
+  .card .lbl{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.6px}
+  .card .val{font-size:34px;font-weight:700;margin:6px 0 2px;color:#e5e5e5}
+  .card .unit{font-size:11px;color:#555}
+  .box{background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:20px 24px;margin-bottom:16px}
+  .box h2{font-size:12px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  .bar-bg{background:#1e1e1e;border-radius:6px;height:14px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;background:#5B47E0;transition:width .8s ease}
+  .bar-meta{display:flex;justify-content:space-between;font-size:11px;color:#555;margin-top:8px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px}
+  .badge.collecting{background:#2b1a0d;color:#fb923c;border:1px solid #6b4a1a}
+  .badge.ontrack{background:#0d2b0d;color:#4ade80;border:1px solid #2a6b2a}
+  .badge.ready{background:#0d1a2b;color:#60a5fa;border:1px solid #1a3a6b}
+  .dist-row{display:flex;align-items:center;gap:12px;margin-bottom:9px}
+  .dist-lbl{width:90px;font-size:12px;color:#777;text-transform:capitalize}
+  .dist-bg{flex:1;background:#1a1a1a;border-radius:4px;height:9px;overflow:hidden}
+  .dist-fill{height:100%;border-radius:4px;transition:width .6s ease}
+  .dist-n{width:28px;text-align:right;font-size:12px;color:#555}
+  .session-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #161616;font-size:12px;gap:12px}
+  .session-row:last-child{border-bottom:none}
+  .s-badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+  .s-active{background:#0d2b0d;color:#4ade80;border:1px solid #2a6b2a}
+  .s-ended{background:#1a1a1a;color:#555;border:1px solid #2a2a2a}
+  .refresh{padding:8px 18px;background:#5B47E0;color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;margin-bottom:16px}
+  .refresh:hover{background:#4a38c4}
+  .msg{font-size:12px;color:#555;margin-bottom:16px;min-height:18px}
+  .tip{background:#111;border:1px solid #1e1e1e;border-left:3px solid #5B47E0;border-radius:8px;padding:14px 18px;font-size:12px;color:#888;line-height:1.7;margin-bottom:16px}
+  .tip b{color:#bbb}
+</style>
+</head>
+<body>
+
+<h1>🔬 FocusLens — Data Collection Progress</h1>
+<p class="sub">Bookmark this page. Keep backend running and open it anytime.</p>
+
+<div class="tip">
+  <b>Daily routine:</b> Start backend + desktop app → work normally → answer the focus prompt every 20 min → check this page.<br>
+  <b>Goal:</b> 200 labeled windows → then come back to Claude to train the ML model.
+</div>
+
+<button class="refresh" onclick="load()">↻ Refresh</button>
+<div class="msg" id="msg">Loading...</div>
+
+<div class="grid">
+  <div class="card"><div class="lbl">Total labels</div><div class="val" id="v-labels">—</div><div class="unit">of 200 target</div></div>
+  <div class="card"><div class="lbl">Sessions recorded</div><div class="val" id="v-sessions">—</div><div class="unit">work sessions</div></div>
+  <div class="card"><div class="lbl">Telemetry events</div><div class="val" id="v-events">—</div><div class="unit">stored in MongoDB</div></div>
+  <div class="card"><div class="lbl">Days remaining</div><div class="val" id="v-days">—</div><div class="unit">at current pace</div></div>
+</div>
+
+<div class="box">
+  <h2>Progress to ML training <span class="badge collecting" id="track-badge">Collecting data</span></h2>
+  <div class="bar-bg"><div class="bar-fill" id="prog-bar" style="width:0%"></div></div>
+  <div class="bar-meta"><span id="prog-text">0 / 200 labels</span><span id="prog-pct">0%</span></div>
+</div>
+
+<div class="box">
+  <h2>Label distribution — balance matters for accuracy</h2>
+  <div id="dist-rows"><div style="color:#444;font-size:12px">No labels yet — click "Label my current state" in the Electron app</div></div>
+</div>
+
+<div class="box">
+  <h2>Recent sessions</h2>
+  <div id="session-rows"><div style="color:#444;font-size:12px">Loading...</div></div>
+</div>
+
+<script>
+const COLORS={focused:'#4ade80',distracted:'#fb923c',fatigued:'#60a5fa',overloaded:'#f87171',neutral:'#888'}
+const ORDER=['focused','distracted','fatigued','overloaded','neutral']
+
+async function load(){
+  document.getElementById('msg').textContent='Refreshing...'
+  try{
+    // Get latest session
+    const s=await fetch('/api/sessions/latest')
+    if(!s.ok) throw new Error('No session found — start the Electron desktop app first')
+    const session=await s.json()
+
+    // Get all sessions count
+    const all=await fetch('/api/sessions/user/'+session.user_id)
+    const allData=await all.json()
+    const sessions=allData.sessions||[]
+
+    // Aggregate labels across ALL sessions
+    let allLabels=[]
+    for(const sess of sessions){
+      try{
+        const lr=await fetch('/api/sessions/'+sess.id+'/labels')
+        const ld=await lr.json()
+        allLabels=allLabels.concat(ld.labels||[])
+      }catch{}
+    }
+
+    // Get event count from MongoDB via features endpoint
+    const fr=await fetch('/api/telemetry/'+session.id+'/features')
+    const feat=await fr.json()
+
+    updateUI(session,sessions,allLabels,feat)
+    document.getElementById('msg').textContent='Last updated: '+new Date().toLocaleTimeString()
+  }catch(e){
+    document.getElementById('msg').textContent='⚠ '+e.message
+  }
+}
+
+function updateUI(latest,sessions,labels,feat){
+  const total=labels.length
+  const remaining=Math.max(0,200-total)
+  const daysLeft=total>0?Math.ceil(remaining/6):'~14'
+
+  document.getElementById('v-labels').textContent=total
+  document.getElementById('v-sessions').textContent=sessions.length
+  document.getElementById('v-events').textContent=feat.eventCount>0?(feat.eventCount).toLocaleString():0
+  document.getElementById('v-days').textContent=daysLeft
+
+  // Progress bar
+  const pct=Math.min(100,Math.round((total/200)*100))
+  document.getElementById('prog-bar').style.width=pct+'%'
+  document.getElementById('prog-text').textContent=total+' / 200 labels'
+  document.getElementById('prog-pct').textContent=pct+'%'
+
+  const badge=document.getElementById('track-badge')
+  if(total>=200){badge.textContent='✓ Ready to train!';badge.className='badge ready'}
+  else if(total>=50){badge.textContent='On track';badge.className='badge ontrack'}
+  else{badge.textContent='Collecting data';badge.className='badge collecting'}
+
+  // Distribution
+  const dist={}
+  labels.forEach(l=>{dist[l.label]=(dist[l.label]||0)+1})
+  const maxC=Math.max(1,...Object.values(dist))
+  if(total>0){
+    document.getElementById('dist-rows').innerHTML=ORDER.map(lbl=>{
+      const c=dist[lbl]||0
+      const p=(c/maxC)*100
+      return `<div class="dist-row">
+        <span class="dist-lbl">${lbl}</span>
+        <div class="dist-bg"><div class="dist-fill" style="width:${p}%;background:${COLORS[lbl]}"></div></div>
+        <span class="dist-n">${c}</span>
+      </div>`
+    }).join('')
+  }
+
+  // Sessions table
+  document.getElementById('session-rows').innerHTML=sessions.slice(0,8).map(s=>{
+    const d=new Date(s.started_at).toLocaleDateString()
+    const t=new Date(s.started_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+    const isActive=s.status==='active'
+    return `<div class="session-row">
+      <span style="color:#555;font-family:monospace">${s.id.slice(0,10)}…</span>
+      <span style="color:#555">${d} ${t}</span>
+      <span class="s-badge ${isActive?'s-active':'s-ended'}">${isActive?'active':'ended'}</span>
+    </div>`
+  }).join('')
+}
+
+load()
+setInterval(load,30000)
+</script>
+</body>
+</html>

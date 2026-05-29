@@ -1,0 +1,16 @@
+{
+  "name": "focuslens",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "backend": "cd backend && npm run dev",
+    "dashboard": "cd dashboard && npm run dev",
+    "desktop": "cd desktop && npm start",
+    "ml": "cd ml && python inference/main.py",
+    "dev": "concurrently \"npm run backend\" \"npm run dashboard\"",
+    "install:all": "cd desktop && npm install && cd ../backend && npm install && cd ../dashboard && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
